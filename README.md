@@ -47,7 +47,8 @@ Add this configuration:
       "command": "node",
       "args": ["/absolute/path/to/mcp-maven-test-runner/build/index.js"],
       "env": {
-        "WORKSPACE_DIR": "/Users/username/source/nav/melosys-api"
+        "WORKSPACE_DIR": "/Users/username/source/nav/melosys-api",
+        "PATH": "/Users/username/.sdkman/candidates/maven/current/bin:/Users/username/.sdkman/candidates/java/current/bin:/usr/local/bin:/usr/bin:/bin"
       }
     }
   }
@@ -57,6 +58,10 @@ Add this configuration:
 **Important**:
 - Replace `/absolute/path/to/mcp-maven-test-runner` with the actual path to this project
 - Replace `WORKSPACE_DIR` with your Maven project's root directory
+- **Update `PATH` to include your Maven and Java installations**:
+  - Run `echo $PATH` in your terminal to get your full PATH
+  - Make sure it includes paths to Maven (`mvn`) and Java (`java`)
+  - Common locations: `~/.sdkman/candidates/maven/current/bin`, `/opt/homebrew/bin`, `/usr/local/bin`
 - Tilde (`~`) expansion is supported in `WORKSPACE_DIR`
 
 4. Restart Claude Desktop
@@ -123,6 +128,22 @@ testOppdaterMedlemsperiode: NullPointerException at line 45
 5. Claude presents the results in a human-readable format
 
 ## Troubleshooting
+
+### "mvn: command not found" error
+This is the most common issue. The MCP server runs in a minimal environment without your shell's PATH.
+
+**Solution**: Add your PATH to the Claude Desktop config:
+1. Run `echo $PATH` in your terminal
+2. Copy the entire PATH value
+3. Add it to the `env` section in your Claude Desktop config:
+```json
+"env": {
+  "WORKSPACE_DIR": "/path/to/workspace",
+  "PATH": "/your/full/path/here"
+}
+```
+4. Make sure the PATH includes Maven and Java directories
+5. Restart Claude Desktop
 
 ### "Script not found" error
 - Verify the script exists at `~/.claude/scripts/run-tests.sh`

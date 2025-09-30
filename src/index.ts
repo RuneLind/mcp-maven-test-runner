@@ -34,33 +34,39 @@ interface TestResult {
 // Parse test output for concise summary
 function parseTestOutput(stdout: string, stderr: string, exitCode: number, duration: number): TestResult {
   const output = stdout + "\n" + stderr;
+  const lines = output.split("\n");
 
-  // Extract test summary line
-  const summaryMatch = output.match(/Tests run: (\d+).*?Failures: (\d+).*?Errors: (\d+).*?Skipped: (\d+)/);
+  // The script already provides formatted output, so we parse its structure
+  // Look for success/failure indicators
+  const hasSuccess = output.includes("✅ SUCCESS");
+  const hasFailed = output.includes("❌ FAILED");
 
-  if (exitCode === 0) {
-    if (summaryMatch) {
-      const [, testsRun, failures, errors] = summaryMatch;
-      const total = parseInt(testsRun);
+  // Extract test summary line - can be either [INFO] or plain format
+  const summaryMatch = output.match(/(?:\[INFO\] )?Tests run: (\d+)(?:,)? Failures: (\d+)(?:,)? Errors: (\d+)(?:,)? Skipped: (\d+)/);
 
-      if (total === 0) {
-        return {
-          success: false,
-          message: "⚠️  No tests were run. Check your test configuration.",
-          duration
-        };
-      }
+  // Extract test count from script output (e.g., "🧪 142 tests executed")
+  const testCountMatch = output.match(/🧪 (\d+) tests? executed/);
 
+  if (exitCode === 0 && hasSuccess) {
+    let testCount = 0;
+
+    if (testCountMatch) {
+      testCount = parseInt(testCountMatch[1]);
+    } else if (summaryMatch) {
+      testCount = parseInt(summaryMatch[1]);
+    }
+
+    if (testCount === 0) {
       return {
-        success: true,
-        message: `✅ All tests passed (${total} test${total === 1 ? '' : 's'} run in ${duration}s)`,
+        success: false,
+        message: "⚠️  No tests were run. Check your test configuration.",
         duration
       };
     }
 
     return {
       success: true,
-      message: `✅ Tests completed successfully (${duration}s)`,
+      message: `✅ All tests passed (${testCount} test${testCount === 1 ? '' : 's'} run in ${duration}s)`,
       duration
     };
   }
@@ -68,59 +74,65 @@ function parseTestOutput(stdout: string, stderr: string, exitCode: number, durat
   // Failed tests
   let message = "❌ Tests failed\n\n";
 
+  // Add test summary if available
   if (summaryMatch) {
     const [, testsRun, failures, errors, skipped] = summaryMatch;
     message += `Tests run: ${testsRun}, Failures: ${failures}, Errors: ${errors}, Skipped: ${skipped}\n\n`;
   }
 
-  // Extract failure details
-  const failureBlocks: string[] = [];
-  const lines = output.split("\n");
-
-  let inFailure = false;
-  let currentFailure: string[] = [];
+  // Extract failure details from the script's formatted output
+  // The script shows errors after "🔍 Failure details:" or errors from [ERROR] lines
+  let inFailureSection = false;
+  const failureLines: string[] = [];
+  const errorLines: string[] = [];
 
   for (const line of lines) {
-    if (line.includes("Failed tests:") || line.includes("Tests in error:")) {
-      inFailure = true;
+    // Detect failure section
+    if (line.includes("🔍 Failure details:") || line.includes("🔍 Errors:")) {
+      inFailureSection = true;
       continue;
     }
 
-    if (inFailure) {
-      if (line.trim() === "" && currentFailure.length > 0) {
-        failureBlocks.push(currentFailure.join("\n"));
-        currentFailure = [];
-        if (failureBlocks.length >= 5) break; // Limit to first 5 failures
-      } else if (line.trim()) {
-        currentFailure.push(line.trim());
-      }
+    // Stop at certain markers
+    if (line.includes("📄 Full log at:") || line.includes("⏱️ Total time:")) {
+      inFailureSection = false;
+      continue;
+    }
+
+    // Collect failure details
+    if (inFailureSection && line.trim()) {
+      failureLines.push(line.trim());
+    }
+
+    // Also collect ERROR lines
+    if (line.includes("[ERROR]")) {
+      errorLines.push(line.trim());
     }
   }
 
-  if (currentFailure.length > 0 && failureBlocks.length < 5) {
-    failureBlocks.push(currentFailure.join("\n"));
+  // Add failure details to message
+  if (failureLines.length > 0) {
+    message += "🔍 Failure details:\n";
+    // Limit to first 20 lines
+    message += failureLines.slice(0, 20).join("\n");
+    if (failureLines.length > 20) {
+      message += `\n... (${failureLines.length - 20} more lines)`;
+    }
+  } else if (errorLines.length > 0) {
+    message += "🔍 Errors:\n";
+    message += errorLines.slice(0, 10).join("\n");
   }
 
-  if (failureBlocks.length > 0) {
-    message += "🔍 Failure details:\n" + failureBlocks.join("\n\n");
-  } else {
-    // If no structured failures found, show relevant error lines
-    const errorLines = lines
-      .filter(line => line.includes("[ERROR]") || line.includes("FAILED") || line.includes("Exception"))
-      .slice(0, 10);
-
-    if (errorLines.length > 0) {
-      message += "🔍 Errors:\n" + errorLines.join("\n");
+  // Extract hints from the script output
+  const hints: string[] = [];
+  for (const line of lines) {
+    if (line.includes("💡")) {
+      hints.push(line.trim());
     }
   }
 
-  // Check for common issues and add hints
-  if (output.includes("NoClassDefFoundError") || output.includes("ClassNotFoundException")) {
-    message += "\n\n💡 Tip: Cross-module dependency issue. Try running with -am flag.";
-  } else if (output.includes("JsonMappingException") || output.includes("JsonParseException")) {
-    message += "\n\n💡 Tip: Jackson serialization issue (common after Java→Kotlin conversion).";
-  } else if (output.includes("cannot find symbol") || output.includes("package") && output.includes("does not exist")) {
-    message += "\n\n💡 Tip: Compilation error. Try clean build first.";
+  if (hints.length > 0) {
+    message += "\n\n" + hints.join("\n");
   }
 
   return {
@@ -142,11 +154,19 @@ async function runTests(project: string, testClass?: string): Promise<TestResult
 
     const startTime = Date.now();
 
+    // Build environment with proper PATH
+    // Inherit parent process environment and ensure Maven/Java are available
+    const env = {
+      ...process.env,
+      PATH: process.env.PATH || "/usr/local/bin:/usr/bin:/bin",
+    };
+
     // Execute the script
     const child = spawn(SCRIPT_PATH, args, {
       cwd: WORKSPACE_DIR,
       timeout: 300000, // 5 minutes
       shell: true,
+      env,
     });
 
     let stdout = "";
