@@ -1,14 +1,23 @@
 # Maven Test Runner MCP Server
 
-An MCP (Model Context Protocol) server that allows Claude Desktop to run Maven tests and get concise, actionable test results. Perfect for verifying code refactoring without getting overwhelmed by verbose Maven output.
+An MCP (Model Context Protocol) server that allows Claude Desktop to run Maven tests, read source files, and make code changes. Perfect for verifying refactoring and editing code directly from Claude Desktop.
 
 ## Features
 
+### Testing
 - **Concise Test Reports**: Get clear ✅/❌ results without Maven's verbose output
 - **Smart Error Detection**: Automatically identifies compilation issues, dependency problems, and test failures
 - **Helpful Hints**: Suggests fixes for common issues (missing `-am` flag, Jackson errors, etc.)
 - **Flexible Testing**: Run all tests in a module or target specific test classes
+
+### File Operations
+- **Read Source Files**: View any file in your workspace (Kotlin, Java, XML, etc.)
+- **Edit Files**: Modify source code directly from Claude Desktop
+- **Path Flexibility**: Support for both absolute and workspace-relative paths
+
+### General
 - **Workspace Awareness**: Configurable workspace directory with tilde expansion support
+- **Safe Operations**: Read files before writing, with clear error messages
 
 ## Prerequisites
 
@@ -87,12 +96,40 @@ Run the UserServiceTest tests in the service module
 I just refactored the UserService class. Can you run the tests to make sure everything still works?
 ```
 
+**Read and edit files:**
+```
+Show me the Behandling.kt file in the domain module
+```
+```
+Update the Behandling class to add a new method for validation
+```
+
 ### Tool Interface
 
-The server provides a `run_tests` tool with these parameters:
+The server provides three tools:
+
+#### 1. `run_tests`
+Run Maven tests for a specific module.
 
 - `project` (required): Maven module name (e.g., "domain", "service", "common")
 - `testClass` (optional): Specific test class to run (e.g., "UserServiceTest")
+
+#### 2. `read_file`
+Read the contents of a source file.
+
+Parameters:
+- `filePath` (required): Path to file (absolute or relative to workspace)
+  - Example: `domain/src/main/kotlin/no/nav/melosys/domain/Behandling.kt`
+  - Example: `~/source/nav/melosys-api/domain/src/main/kotlin/no/nav/melosys/domain/Behandling.kt`
+
+#### 3. `write_file`
+Write or update a source file.
+
+⚠️ **Warning**: This overwrites the entire file. Always read the file first!
+
+Parameters:
+- `filePath` (required): Path to file (absolute or relative to workspace)
+- `content` (required): Complete new file content
 
 ## Output Examples
 
@@ -118,6 +155,31 @@ testUpdateUser: NullPointerException at line 45
 ```
 ⚠️  No tests were run. Check your test configuration.
 ```
+
+## Typical Workflow
+
+Here's a common workflow using all three tools:
+
+1. **Read existing code**:
+   ```
+   Show me the Behandling.kt file
+   ```
+
+2. **Make changes**:
+   ```
+   Add a validation method that checks if the status is valid
+   ```
+   (Claude will read the file, understand it, and write the updated version)
+
+3. **Verify changes**:
+   ```
+   Run the domain tests to make sure my changes work
+   ```
+
+4. **Fix issues if needed**:
+   ```
+   The test failed - can you fix the validation logic?
+   ```
 
 ## How It Works
 
