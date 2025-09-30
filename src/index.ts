@@ -8,6 +8,7 @@ import {
   Tool,
 } from "@modelcontextprotocol/sdk/types.js";
 import { spawn } from "child_process";
+import { readFile, writeFile } from "fs/promises";
 import { homedir } from "os";
 import { resolve } from "path";
 
@@ -197,7 +198,20 @@ async function runTests(project: string, testClass?: string): Promise<TestResult
   });
 }
 
-// Define the tool
+// Read file function
+async function readFileContent(filePath: string): Promise<string> {
+  const absolutePath = resolve(expandPath(filePath));
+  const content = await readFile(absolutePath, "utf-8");
+  return content;
+}
+
+// Write file function
+async function writeFileContent(filePath: string, content: string): Promise<void> {
+  const absolutePath = resolve(expandPath(filePath));
+  await writeFile(absolutePath, content, "utf-8");
+}
+
+// Define the tools
 const RUN_TESTS_TOOL: Tool = {
   name: "run_tests",
   description: `Run Maven tests for a specific project module using the test wrapper script.
@@ -232,6 +246,67 @@ Workspace: ${WORKSPACE_DIR}`,
   },
 };
 
+const READ_FILE_TOOL: Tool = {
+  name: "read_file",
+  description: `Read the contents of a file in the workspace.
+
+This tool allows you to view source code files before making changes.
+Supports both absolute paths and paths relative to the workspace directory.
+
+Parameters:
+- filePath: Path to the file (e.g., "domain/src/main/kotlin/no/nav/melosys/domain/Behandling.kt" or absolute path)
+
+Use this tool to:
+- Examine code before refactoring
+- Review class implementations
+- Understand existing code structure
+
+Workspace: ${WORKSPACE_DIR}`,
+  inputSchema: {
+    type: "object",
+    properties: {
+      filePath: {
+        type: "string",
+        description: "Path to the file to read (relative to workspace or absolute)",
+      },
+    },
+    required: ["filePath"],
+  },
+};
+
+const WRITE_FILE_TOOL: Tool = {
+  name: "write_file",
+  description: `Write or update a file in the workspace.
+
+This tool allows you to modify source code files.
+⚠️  WARNING: This overwrites the entire file content. Use with caution.
+
+Parameters:
+- filePath: Path to the file (relative to workspace or absolute)
+- content: The complete new content of the file
+
+Best practices:
+- Always read the file first to understand its current content
+- Preserve existing code structure and formatting
+- Test changes by running tests after modifications
+
+Workspace: ${WORKSPACE_DIR}`,
+  inputSchema: {
+    type: "object",
+    properties: {
+      filePath: {
+        type: "string",
+        description: "Path to the file to write (relative to workspace or absolute)",
+      },
+      content: {
+        type: "string",
+        description: "The complete new content to write to the file",
+      },
+    },
+    required: ["filePath", "content"],
+  },
+};
+
 // Create and configure the server
 const server = new Server(
   {
@@ -248,7 +323,7 @@ const server = new Server(
 // List available tools
 server.setRequestHandler(ListToolsRequestSchema, async () => {
   return {
-    tools: [RUN_TESTS_TOOL],
+    tools: [RUN_TESTS_TOOL, READ_FILE_TOOL, WRITE_FILE_TOOL],
   };
 });
 
@@ -287,6 +362,105 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         message += `\n\n💡 Make the script executable: chmod +x ${SCRIPT_PATH}`;
       } else if (errorMessage.includes("timeout")) {
         message += "\n\n💡 Tests took too long (>5 minutes). Consider running fewer tests.";
+      }
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: message,
+          },
+        ],
+        isError: true,
+      };
+    }
+  }
+
+  if (request.params.name === "read_file") {
+    const { filePath } = request.params.arguments as {
+      filePath: string;
+    };
+
+    if (!filePath) {
+      throw new Error("filePath parameter is required");
+    }
+
+    try {
+      // Handle both absolute and relative paths
+      const fullPath = filePath.startsWith("/") || filePath.startsWith("~")
+        ? filePath
+        : resolve(WORKSPACE_DIR, filePath);
+
+      const content = await readFileContent(fullPath);
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: content,
+          },
+        ],
+      };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      let message = `❌ Error reading file: ${errorMessage}`;
+
+      if (errorMessage.includes("ENOENT")) {
+        message += `\n\n💡 File not found. Check the path is correct.`;
+      } else if (errorMessage.includes("EACCES")) {
+        message += `\n\n💡 Permission denied. Check file permissions.`;
+      }
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: message,
+          },
+        ],
+        isError: true,
+      };
+    }
+  }
+
+  if (request.params.name === "write_file") {
+    const { filePath, content } = request.params.arguments as {
+      filePath: string;
+      content: string;
+    };
+
+    if (!filePath) {
+      throw new Error("filePath parameter is required");
+    }
+
+    if (content === undefined) {
+      throw new Error("content parameter is required");
+    }
+
+    try {
+      // Handle both absolute and relative paths
+      const fullPath = filePath.startsWith("/") || filePath.startsWith("~")
+        ? filePath
+        : resolve(WORKSPACE_DIR, filePath);
+
+      await writeFileContent(fullPath, content);
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: `✅ File written successfully: ${filePath}`,
+          },
+        ],
+      };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      let message = `❌ Error writing file: ${errorMessage}`;
+
+      if (errorMessage.includes("ENOENT")) {
+        message += `\n\n💡 Directory doesn't exist. Create the directory first.`;
+      } else if (errorMessage.includes("EACCES")) {
+        message += `\n\n💡 Permission denied. Check file/directory permissions.`;
       }
 
       return {
