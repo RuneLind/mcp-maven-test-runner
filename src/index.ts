@@ -22,7 +22,7 @@ function expandPath(path: string): string {
 
 // Get workspace directory from environment or use default
 const WORKSPACE_DIR = expandPath(
-  process.env.WORKSPACE_DIR || "~/source/nav/melosys-api"
+  process.env.WORKSPACE_DIR || "~/projects/my-maven-project"
 );
 const SCRIPT_PATH = expandPath("~/.claude/scripts/run-tests.sh");
 
@@ -220,8 +220,8 @@ This tool executes tests in your Maven project and returns a concise summary.
 Perfect for verifying code refactoring or checking if specific tests pass.
 
 Parameters:
-- project: The Maven module name (e.g., "saksflyt", "common", "domain")
-- testClass: (optional) Specific test class to run (e.g., "LagreMedlemsperiodeMedlTest")
+- project: The Maven module name (e.g., "domain", "service", "common")
+- testClass: (optional) Specific test class to run (e.g., "UserServiceTest")
 
 The tool automatically handles:
 - Running tests in the correct workspace directory
@@ -235,11 +235,11 @@ Workspace: ${WORKSPACE_DIR}`,
     properties: {
       project: {
         type: "string",
-        description: "The Maven module/project name (e.g., 'saksflyt')",
+        description: "The Maven module/project name (e.g., 'domain', 'service')",
       },
       testClass: {
         type: "string",
-        description: "Optional: Specific test class to run (e.g., 'LagreMedlemsperiodeMedlTest')",
+        description: "Optional: Specific test class to run (e.g., 'UserServiceTest')",
       },
     },
     required: ["project"],

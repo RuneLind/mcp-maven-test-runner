@@ -56,7 +56,7 @@ Add this configuration:
       "command": "node",
       "args": ["/absolute/path/to/mcp-maven-test-runner/build/index.js"],
       "env": {
-        "WORKSPACE_DIR": "/Users/username/source/nav/melosys-api",
+        "WORKSPACE_DIR": "/Users/username/projects/my-maven-project",
         "PATH": "/Users/username/.sdkman/candidates/maven/current/bin:/Users/username/.sdkman/candidates/java/current/bin:/usr/local/bin:/usr/bin:/bin"
       }
     }
@@ -83,17 +83,17 @@ Once configured, Claude can run tests using natural language:
 
 **Run all tests in a module:**
 ```
-Run all tests in the saksflyt module
+Run all tests in the domain module
 ```
 
 **Run a specific test class:**
 ```
-Run the LagreMedlemsperiodeMedlTest tests in the saksflyt module
+Run the UserServiceTest tests in the service module
 ```
 
 **Verify refactoring:**
 ```
-I just refactored the Medlemsperiode class. Can you run the tests to make sure everything still works?
+I just refactored the UserService class. Can you run the tests to make sure everything still works?
 ```
 
 **Read and edit files:**
@@ -111,9 +111,8 @@ The server provides three tools:
 #### 1. `run_tests`
 Run Maven tests for a specific module.
 
-Parameters:
-- `project` (required): Maven module name (e.g., "saksflyt", "domain", "common")
-- `testClass` (optional): Specific test class to run (e.g., "LagreMedlemsperiodeMedlTest")
+- `project` (required): Maven module name (e.g., "domain", "service", "common")
+- `testClass` (optional): Specific test class to run (e.g., "UserServiceTest")
 
 #### 2. `read_file`
 Read the contents of a source file.
@@ -146,8 +145,8 @@ Parameters:
 Tests run: 5, Failures: 2, Errors: 0, Skipped: 0
 
 🔍 Failure details:
-testLagreMedlemsperiode: Expected <2023-01-01> but was <2023-01-02>
-testOppdaterMedlemsperiode: NullPointerException at line 45
+testCreateUser: Expected <2023-01-01> but was <2023-01-02>
+testUpdateUser: NullPointerException at line 45
 
 💡 Tip: Cross-module dependency issue. Try running with -am flag.
 ```
