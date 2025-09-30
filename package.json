@@ -1,0 +1,30 @@
+{
+  "name": "mcp-maven-test-runner",
+  "version": "1.0.0",
+  "description": "MCP server for running Maven tests from Claude Desktop - verify code refactoring with concise test reports",
+  "main": "build/index.js",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc --watch",
+    "prepare": "npm run build"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/RuneLind/mcp-maven-test-runner.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/RuneLind/mcp-maven-test-runner/issues"
+  },
+  "homepage": "https://github.com/RuneLind/mcp-maven-test-runner#readme",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.18.2"
+  },
+  "devDependencies": {
+    "@types/node": "^24.6.0",
+    "typescript": "^5.9.2"
+  }
+}
